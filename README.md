@@ -125,6 +125,10 @@ DiffLens is designed with privacy as a core principle:
 
 ---
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=FSoft-AI4Code/CodeWiki,nbslabs/difflense&type=date&legend=top-left)](https://www.star-history.com/#FSoft-AI4Code/CodeWiki&nbslabs/difflense&type=date&legend=top-left)
+
 <div align="center">
   <strong>Made with ❤️ for developers who value privacy</strong>
 </div>
