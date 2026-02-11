@@ -45,6 +45,30 @@ DiffLens is a static website project. To run it locally:
 
 3. Open your browser and navigate to `http://localhost:8000`
 
+## Self-Hosting with Docker
+
+Run DiffLens anywhere Docker is available using the published container image.
+
+### Use the published image
+
+```bash
+docker run -d \
+   --name difflense \
+   -p 8080:80 \
+   ghcr.io/nbslabs/difflense:latest
+```
+
+Then open `http://localhost:8080` in your browser.
+
+### Build the image yourself
+
+```bash
+docker build -t difflense:local .
+docker run -d --name difflense-local -p 8080:80 difflense:local
+```
+
+To customize the static content, edit the files in this repository and rebuild the image.
+
 ## How to Use
 
 1. **Generate a diff**: Run `git diff` in your repository
