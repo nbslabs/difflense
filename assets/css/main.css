@@ -179,6 +179,197 @@
     line-height: 1.125rem;
 }
 
+/* Comment System Styles */
+.diff-line-container {
+    position: relative;
+}
+
+.diff-line {
+    position: relative;
+}
+
+.diff-line-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.diff-line:hover .diff-line-actions {
+    opacity: 1;
+}
+
+.comment-btn {
+    background: #3b82f6;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: white;
+    font-size: 12px;
+    transition: background-color 0.2s ease;
+}
+
+.comment-btn:hover {
+    background: #2563eb;
+}
+
+.comment-btn.has-comments {
+    background: #dc2626;
+}
+
+.comment-btn.has-comments:hover {
+    background: #b91c1c;
+}
+
+.comment-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.comment-count {
+    font-weight: bold;
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 1px 4px;
+    min-width: 16px;
+    text-align: center;
+}
+
+.comments-section {
+    background: #f8fafc;
+    border-left: 3px solid #3b82f6;
+    margin: 4px 0;
+    padding: 8px 12px;
+}
+
+.comment-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    position: relative;
+}
+
+.comment-item:last-child {
+    margin-bottom: 0;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.comment-author {
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.comment-timestamp {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.comment-delete-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+}
+
+.comment-delete-btn:hover {
+    background: #fee2e2;
+}
+
+.comment-text {
+    color: #374151;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.comment-input-container {
+    background: #f1f5f9;
+    border-left: 3px solid #10b981;
+    margin: 4px 0;
+    padding: 8px 12px;
+}
+
+.comment-input-box {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.comment-textarea {
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: vertical;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    min-height: 60px;
+}
+
+.comment-input-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: flex-end;
+}
+
+.comment-save-btn {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.comment-save-btn:hover {
+    background: #059669;
+}
+
+.comment-cancel-btn {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.comment-cancel-btn:hover {
+    background: #4b5563;
+}
+
 /* File header styling */
 .diff-file-header {
     background-color: #1f2937;

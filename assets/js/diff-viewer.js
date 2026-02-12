@@ -6,6 +6,7 @@ window.DiffViewer = {
     currentViewMode: 'unified',
     sidebarVisible: false,
     expandAllFiles: true, // Default to expanded
+    comments: {}, // Store comments by file path and line key
 
     /**
      * Initialize the diff viewer
@@ -234,8 +235,210 @@ window.DiffViewer = {
         }
 
         this.currentDiff = null;
+        this.comments = {}; // Clear all comments
         this.hideDiffOutput();
         this.showNoDiffMessage();
+    },
+
+    /**
+     * Comment Management Functions
+     */
+
+    /**
+     * Generate a unique key for a line comment
+     */
+    generateLineKey(filePath, lineType, lineNumber) {
+        // Create a unique key that works for both unified and side-by-side views
+        return `${filePath}:${lineType}:${lineNumber}`;
+    },
+
+    /**
+     * Add or update a comment for a specific line
+     */
+    addComment(filePath, lineType, lineNumber, commentText, author = 'Anonymous') {
+        const lineKey = this.generateLineKey(filePath, lineType, lineNumber);
+        
+        if (!this.comments[filePath]) {
+            this.comments[filePath] = {};
+        }
+        
+        if (!this.comments[filePath][lineKey]) {
+            this.comments[filePath][lineKey] = [];
+        }
+        
+        const comment = {
+            id: Date.now() + Math.random(),
+            text: commentText,
+            author: author,
+            timestamp: new Date().toISOString(),
+            lineType: lineType,
+            lineNumber: lineNumber
+        };
+        
+        this.comments[filePath][lineKey].push(comment);
+        return comment;
+    },
+
+    /**
+     * Get comments for a specific line
+     */
+    getCommentsForLine(filePath, lineType, lineNumber) {
+        const lineKey = this.generateLineKey(filePath, lineType, lineNumber);
+        return this.comments[filePath]?.[lineKey] || [];
+    },
+
+    /**
+     * Remove a comment by ID
+     */
+    removeComment(filePath, lineType, lineNumber, commentId) {
+        const lineKey = this.generateLineKey(filePath, lineType, lineNumber);
+        if (this.comments[filePath]?.[lineKey]) {
+            this.comments[filePath][lineKey] = this.comments[filePath][lineKey].filter(
+                comment => comment.id !== commentId
+            );
+            
+            // Clean up empty arrays
+            if (this.comments[filePath][lineKey].length === 0) {
+                delete this.comments[filePath][lineKey];
+            }
+            
+            // Clean up empty file objects
+            if (Object.keys(this.comments[filePath]).length === 0) {
+                delete this.comments[filePath];
+            }
+        }
+    },
+
+    /**
+     * Get all comments for the current diff
+     */
+    getAllComments() {
+        return this.comments;
+    },
+
+    /**
+     * Set all comments (used when loading from URL)
+     */
+    setAllComments(comments) {
+        this.comments = comments || {};
+    },
+
+    /**
+     * Get line number for comment identification
+     */
+    getLineNumberForComment(line) {
+        // Return the appropriate line number based on line type
+        switch (line.type) {
+            case 'added':
+                return line.newLineNumber;
+            case 'removed':
+                return line.oldLineNumber;
+            case 'unchanged':
+                return line.oldLineNumber || line.newLineNumber;
+            default:
+                return null;
+        }
+    },
+
+    /**
+     * Render comments for a specific line
+     */
+    renderCommentsForLine(filePath, lineType, lineNumber) {
+        const comments = this.getCommentsForLine(filePath, lineType, lineNumber);
+        if (comments.length === 0) return '';
+        
+        let html = '<div class="comments-section">';
+        
+        comments.forEach(comment => {
+            html += '<div class="comment-item">';
+            html += `<div class="comment-header">`;
+            html += `<span class="comment-author">${this.escapeHtml(comment.author)}</span>`;
+            html += `<span class="comment-timestamp">${this.formatTimestamp(comment.timestamp)}</span>`;
+            html += `<button class="comment-delete-btn" onclick="window.DiffViewer.deleteComment('${this.escapeHtml(filePath)}', '${lineType}', '${lineNumber}', '${comment.id}')" title="Delete comment">×</button>`;
+            html += `</div>`;
+            html += `<div class="comment-text">${this.escapeHtml(comment.text)}</div>`;
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        return html;
+    },
+
+    /**
+     * Format timestamp for display
+     */
+    formatTimestamp(isoString) {
+        const date = new Date(isoString);
+        return date.toLocaleString();
+    },
+
+    /**
+     * Toggle comment input visibility
+     */
+    toggleCommentInput(filePath, lineType, lineNumber) {
+        const inputContainer = document.getElementById(`comment-input-${filePath}-${lineType}-${lineNumber}`);
+        if (inputContainer) {
+            const isVisible = inputContainer.style.display !== 'none';
+            inputContainer.style.display = isVisible ? 'none' : 'block';
+            
+            if (!isVisible) {
+                // Focus on textarea when showing
+                const textarea = inputContainer.querySelector('.comment-textarea');
+                if (textarea) {
+                    textarea.focus();
+                }
+            }
+        }
+    },
+
+    /**
+     * Save a new comment
+     */
+    saveComment(filePath, lineType, lineNumber) {
+        const inputContainer = document.getElementById(`comment-input-${filePath}-${lineType}-${lineNumber}`);
+        if (inputContainer) {
+            const textarea = inputContainer.querySelector('.comment-textarea');
+            const commentText = textarea.value.trim();
+            
+            if (commentText) {
+                this.addComment(filePath, lineType, lineNumber, commentText);
+                textarea.value = '';
+                inputContainer.style.display = 'none';
+                
+                // Re-render the diff to show the new comment
+                this.renderCurrentDiff();
+            }
+        }
+    },
+
+    /**
+     * Cancel comment input
+     */
+    cancelComment(filePath, lineType, lineNumber) {
+        const inputContainer = document.getElementById(`comment-input-${filePath}-${lineType}-${lineNumber}`);
+        if (inputContainer) {
+            const textarea = inputContainer.querySelector('.comment-textarea');
+            textarea.value = '';
+            inputContainer.style.display = 'none';
+        }
+    },
+
+    /**
+     * Delete a comment
+     */
+    deleteComment(filePath, lineType, lineNumber, commentId) {
+        this.removeComment(filePath, lineType, lineNumber, commentId);
+        // Re-render the diff to hide the deleted comment
+        this.renderCurrentDiff();
+    },
+
+    /**
+     * Re-render the current diff (used after comment changes)
+     */
+    renderCurrentDiff() {
+        if (this.currentDiff) {
+            this.renderDiff(this.currentDiff);
+        }
     },
 
     /**
@@ -331,7 +534,7 @@ window.DiffViewer = {
             
             file.hunks.forEach(hunk => {
                 html += this.renderHunkHeader(hunk);
-                html += this.renderHunkLinesUnified(hunk);
+                html += this.renderHunkLinesUnified(hunk, fileName);
             });
             
             html += '</div>'; // Close file-collapse-content
@@ -425,8 +628,8 @@ window.DiffViewer = {
                 const leftLine = sideBySideData.original[i] || { type: 'empty', content: '', side: 'original' };
                 const rightLine = sideBySideData.modified[i] || { type: 'empty', content: '', side: 'modified' };
                 
-                leftContent += this.renderSingleLine(leftLine, 'original');
-                rightContent += this.renderSingleLine(rightLine, 'modified');
+                leftContent += this.renderSingleLine(leftLine, 'original', fileName);
+                rightContent += this.renderSingleLine(rightLine, 'modified', fileName);
             }
             
             // Close collapsible content
@@ -490,11 +693,11 @@ window.DiffViewer = {
     /**
      * Render side-by-side panel
      */
-    renderSideBySidePanel(lines, side) {
+    renderSideBySidePanel(lines, side, fileName) {
         let html = '';
         
         lines.forEach(line => {
-            html += this.renderSingleLine(line, side);
+            html += this.renderSingleLine(line, side, fileName);
         });
 
         return html;
@@ -503,7 +706,7 @@ window.DiffViewer = {
     /**
      * Render a single line for side-by-side view
      */
-    renderSingleLine(line, side) {
+    renderSingleLine(line, side, fileName) {
         if (line.type === 'empty') {
             return '<div class="diff-line diff-line-empty">' +
                    '<div class="diff-line-number"></div>' +
@@ -511,10 +714,56 @@ window.DiffViewer = {
                    '</div>';
         } else {
             const lineClass = this.getDiffLineClass(line.type);
-            return `<div class="diff-line ${lineClass}">` +
-                   `<div class="diff-line-number">${this.getLineNumber(line, side)}</div>` +
-                   `<div class="diff-line-content">${this.escapeHtml(line.content)}</div>` +
-                   '</div>';
+            const lineNumber = this.getLineNumberForComment(line);
+            const comments = fileName ? this.getCommentsForLine(fileName, line.type, lineNumber) : [];
+            const hasComments = comments.length > 0;
+            
+            let html = '<div class="diff-line-container">';
+            
+            // Main line
+            html += `<div class="diff-line ${lineClass}" data-file="${fileName ? this.escapeHtml(fileName) : ''}" data-line-type="${line.type}" data-line-number="${lineNumber}">`;
+            html += `<div class="diff-line-number">${this.getLineNumber(line, side)}</div>`;
+            html += `<div class="diff-line-content">${this.escapeHtml(line.content)}</div>`;
+            
+            // Comment button (only for actual code lines and when fileName is provided)
+            if (fileName && line.type !== 'context' && lineNumber) {
+                html += `<div class="diff-line-actions">`;
+                html += `<button class="comment-btn ${hasComments ? 'has-comments' : ''}" 
+                           onclick="window.DiffViewer.toggleCommentInput('${this.escapeHtml(fileName)}', '${line.type}', '${lineNumber}')"
+                           title="Add comment">`;
+                html += `<svg class="comment-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">`;
+                html += `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.96 8.96 0 01-4.906-1.451L3 21l2.549-5.094A8.96 8.96 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>`;
+                html += `</svg>`;
+                if (hasComments) {
+                    html += `<span class="comment-count">${comments.length}</span>`;
+                }
+                html += `</button>`;
+                html += `</div>`;
+            }
+            
+            html += '</div>';
+            
+            // Comments section (only when fileName is provided)
+            if (fileName && hasComments) {
+                html += this.renderCommentsForLine(fileName, line.type, lineNumber);
+            }
+            
+            // Comment input (initially hidden, only when fileName is provided)
+            if (fileName && line.type !== 'context' && lineNumber) {
+                html += `<div class="comment-input-container" id="comment-input-${this.escapeHtml(fileName)}-${line.type}-${lineNumber}" style="display: none;">`;
+                html += `<div class="comment-input-box">`;
+                html += `<textarea class="comment-textarea" placeholder="Write a comment..." rows="3"></textarea>`;
+                html += `<div class="comment-input-actions">`;
+                html += `<button class="comment-save-btn" onclick="window.DiffViewer.saveComment('${this.escapeHtml(fileName)}', '${line.type}', '${lineNumber}')">Add Comment</button>`;
+                html += `<button class="comment-cancel-btn" onclick="window.DiffViewer.cancelComment('${this.escapeHtml(fileName)}', '${line.type}', '${lineNumber}')">Cancel</button>`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `</div>`;
+            }
+            
+            html += '</div>'; // Close diff-line-container
+            
+            return html;
         }
     },
 
@@ -567,15 +816,59 @@ window.DiffViewer = {
     /**
      * Render hunk lines for unified view
      */
-    renderHunkLinesUnified(hunk) {
+    renderHunkLinesUnified(hunk, fileName) {
         let html = '';
         
-        hunk.lines.forEach(line => {
+        hunk.lines.forEach((line, lineIndex) => {
             const lineClass = this.getDiffLineClass(line.type);
-            html += `<div class="diff-line ${lineClass}">`;
+            const lineNumber = this.getLineNumberForComment(line);
+            const lineKey = this.generateLineKey(fileName, line.type, lineNumber);
+            const comments = this.getCommentsForLine(fileName, line.type, lineNumber);
+            const hasComments = comments.length > 0;
+            
+            // Main line container
+            html += `<div class="diff-line-container">`;
+            
+            // Actual diff line
+            html += `<div class="diff-line ${lineClass}" data-file="${this.escapeHtml(fileName)}" data-line-type="${line.type}" data-line-number="${lineNumber}">`;
             html += `<div class="diff-line-number">${this.getLineNumberUnified(line)}</div>`;
             html += `<div class="diff-line-content">${this.escapeHtml(line.content)}</div>`;
+            
+            // Comment button (only for actual code lines, not context headers)
+            if (line.type !== 'context' && lineNumber) {
+                html += `<div class="diff-line-actions">`;
+                html += `<button class="comment-btn ${hasComments ? 'has-comments' : ''}" 
+                           onclick="window.DiffViewer.toggleCommentInput('${this.escapeHtml(fileName)}', '${line.type}', '${lineNumber}')"
+                           title="Add comment">`;
+                html += `<svg class="comment-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">`;
+                html += `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.96 8.96 0 01-4.906-1.451L3 21l2.549-5.094A8.96 8.96 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>`;
+                html += `</svg>`;
+                if (hasComments) {
+                    html += `<span class="comment-count">${comments.length}</span>`;
+                }
+                html += `</button>`;
+                html += `</div>`;
+            }
+            
             html += '</div>';
+            
+            // Comments section
+            if (hasComments) {
+                html += this.renderCommentsForLine(fileName, line.type, lineNumber);
+            }
+            
+            // Comment input (initially hidden)
+            html += `<div class="comment-input-container" id="comment-input-${this.escapeHtml(fileName)}-${line.type}-${lineNumber}" style="display: none;">`;
+            html += `<div class="comment-input-box">`;
+            html += `<textarea class="comment-textarea" placeholder="Write a comment..." rows="3"></textarea>`;
+            html += `<div class="comment-input-actions">`;
+            html += `<button class="comment-save-btn" onclick="window.DiffViewer.saveComment('${this.escapeHtml(fileName)}', '${line.type}', '${lineNumber}')">Add Comment</button>`;
+            html += `<button class="comment-cancel-btn" onclick="window.DiffViewer.cancelComment('${this.escapeHtml(fileName)}', '${line.type}', '${lineNumber}')">Cancel</button>`;
+            html += `</div>`;
+            html += `</div>`;
+            html += `</div>`;
+            
+            html += '</div>'; // Close diff-line-container
         });
 
         return html;
@@ -839,8 +1132,102 @@ window.DiffViewer = {
      */
     async loadSharedDiffIfPresent() {
         const urlParams = new URLSearchParams(window.location.search);
-        const sharedDiff = urlParams.get('diff');
+        const sharedData = urlParams.get('data'); // New format with comments
+        const sharedDiff = urlParams.get('diff'); // Legacy format without comments
         
+        // Try new format first (with comments)
+        if (sharedData) {
+            try {
+                // Validate base64 input before decoding
+                if (!this.isValidBase64(sharedData)) {
+                    this.showMessage('Invalid share URL format - corrupted or malformed link', 'error');
+                    return;
+                }
+                
+                let decodedPayload;
+                
+                try {
+                    // Try to decompress (new format with compression)
+                    const compressedData = this.base64ToUint8Array(sharedData);
+                    
+                    // Check if this looks like compressed data (has compression type indicator)
+                    if (compressedData.length > 0 && (compressedData[0] === 0 || compressedData[0] === 1 || compressedData[0] === 2)) {
+                        decodedPayload = await this.decompressBrotli(compressedData);
+                    } else {
+                        // Fallback to direct base64 decoding
+                        let regularBase64 = sharedData
+                            .replace(/-/g, '+')
+                            .replace(/_/g, '/');
+                        while (regularBase64.length % 4) {
+                            regularBase64 += '=';
+                        }
+                        decodedPayload = atob(regularBase64);
+                    }
+                } catch (compressionError) {
+                    // If compression fails, try direct base64 decoding
+                    try {
+                        let regularBase64 = sharedData
+                            .replace(/-/g, '+')
+                            .replace(/_/g, '/');
+                        while (regularBase64.length % 4) {
+                            regularBase64 += '=';
+                        }
+                        decodedPayload = atob(regularBase64);
+                    } catch (legacyError) {
+                        throw new Error('Unable to decode payload in either compressed or uncompressed format');
+                    }
+                }
+                
+                // Parse JSON payload
+                let payload;
+                try {
+                    payload = JSON.parse(decodedPayload);
+                } catch (jsonError) {
+                    throw new Error('Invalid payload format - not valid JSON');
+                }
+                
+                // Validate payload structure
+                if (!payload.diff) {
+                    throw new Error('Invalid payload - missing diff content');
+                }
+                
+                // Validate that decoded content is not empty
+                if (!payload.diff.trim()) {
+                    this.showMessage('Shared diff is empty or invalid', 'error');
+                    return;
+                }
+                
+                // Load comments if present
+                if (payload.comments) {
+                    this.setAllComments(payload.comments);
+                }
+                
+                // Set the decoded content in the textarea
+                const diffInput = document.getElementById('diff-input');
+                if (diffInput) {
+                    diffInput.value = payload.diff;
+                    // Automatically process the diff
+                    this.processDiff();
+                }
+                
+                // Show message about loaded comments if any
+                const commentCount = Object.keys(payload.comments || {}).reduce((total, filePath) => {
+                    return total + Object.keys(payload.comments[filePath] || {}).reduce((fileTotal, lineKey) => {
+                        return fileTotal + (payload.comments[filePath][lineKey] || []).length;
+                    }, 0);
+                }, 0);
+                
+                if (commentCount > 0) {
+                    this.showMessage(`Loaded diff with ${commentCount} comment${commentCount === 1 ? '' : 's'}`, 'success');
+                }
+                
+            } catch (error) {
+                this.showMessage('Error loading shared diff with comments: ' + error.message, 'error');
+            }
+            return;
+        }
+        
+        // Fallback to legacy format (diff only)
         if (sharedDiff) {
             try {
                 // Validate base64 input before decoding
@@ -1090,15 +1477,24 @@ window.DiffViewer = {
      */
     async generateShareableUrl(diffContent) {
         try {
-            // Compress diff content using Brotli (gzip fallback)
-            const compressedData = await this.compressBrotli(diffContent);
+            // Create payload with diff content and comments
+            const payload = {
+                diff: diffContent,
+                comments: this.getAllComments()
+            };
+            
+            // Convert payload to JSON
+            const payloadJson = JSON.stringify(payload);
+            
+            // Compress payload using Brotli (gzip fallback)
+            const compressedData = await this.compressBrotli(payloadJson);
             
             // Convert compressed data to base64
-            const encodedDiff = this.uint8ArrayToBase64(compressedData);
+            const encodedPayload = this.uint8ArrayToBase64(compressedData);
             
-            // Create URL with encoded diff parameter
+            // Create URL with encoded payload parameter
             const baseUrl = window.location.origin + window.location.pathname;
-            const shareUrl = `${baseUrl}?diff=${encodedDiff}`;
+            const shareUrl = `${baseUrl}?data=${encodedPayload}`;
             
             // Validate URL length - URLs longer than 8000 characters may not work properly
             if (shareUrl.length > 8000) {
